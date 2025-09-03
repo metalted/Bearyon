@@ -7,7 +7,7 @@ namespace Bearyon.Shared.Packets.Connection
 {
     public struct RoomConnectionRequestPacket : IPacket
     {
-        public int RoomId;
+        public string RoomId;
 
         public void Serialize(NetOutgoingMessage om)
         {
@@ -16,7 +16,7 @@ namespace Bearyon.Shared.Packets.Connection
 
         public void Deserialize(NetIncomingMessage im)
         {
-            RoomId = im.ReadInt32();
+            RoomId = im.ReadString();
         }
     }
 }

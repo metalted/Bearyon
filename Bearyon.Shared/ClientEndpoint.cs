@@ -4,26 +4,42 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace Bearyon.Shared
-{    public enum ClientLocation { None, Lobby, Game }
-
+{    
     public class ClientEndpoint
     {        
-        public ClientLocation Location = ClientLocation.None;
-
+        private Dictionary<string, ServerProfile> _servers;
         private NetClient _client;
         private readonly PacketHandler _handler;
         private volatile bool _running;
-        private string _host;
-        private int _port;
         private Task _task;
-        public int ClientID { get; set; }
-        public (string, string, int) pendingConnection = ("","",0);
+        public string ClientUID { get; private set; }
+
+        public ServerProfile pendingConnection = null;
+        public ServerProfile currentConnection = null;
 
         public ClientEndpoint(PacketHandler handler)
         {
+            PacketRegistry.RegisterAllPackets();
+
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+            _handler.Attach(this);
+            _servers = new Dictionary<string, ServerProfile>();   
+            
+            ClientUID = System.Guid.NewGuid().ToString();
+        }
+
+        public void AddServer(ServerProfile profile)
+        {
+            if (_servers.ContainsKey(profile.Name))
+            {
+                Console.WriteLine($"[CLIENT] Server with name {profile.Name} already exists.");
+                return;
+            }
+
+            _servers.Add(profile.Name, profile);
         }
 
         public Task Start()
@@ -36,80 +52,99 @@ namespace Bearyon.Shared
 
             return _task;
         }
-        
-        public bool IsRunning()
-        {
-            return _running;
-        }
 
         public async Task Stop()
         {
             _running = false;
 
-            if (_client != null &&
-                !(_client.ConnectionStatus == NetConnectionStatus.None ||
-                  _client.ConnectionStatus == NetConnectionStatus.Disconnected))
+            if(IsConnected())
             {
                 _client.Shutdown("Stopping client");
             }
 
-            // Wait for RunLoop to finish before nuking task reference
             if (_task != null)
                 await _task;
 
             _client = null;
             _task = null;
-            _host = "";
-            _port = -1;
+            pendingConnection = null;
+            currentConnection = null;
         }
 
-        public void ConnectTo(string appIdentifier, string host, int port)
+        public void ConnectTo(string serverName)
         {
-            pendingConnection = (appIdentifier, host, port);
+            if (!_servers.ContainsKey(serverName))
+            {
+                Console.WriteLine($"[CLIENT] Server with name {serverName} doesn't exist.");
+                return;
+            }
 
-            if (_client != null && !(_client.ConnectionStatus == NetConnectionStatus.None || _client.ConnectionStatus == NetConnectionStatus.Disconnected))
+            ConnectTo(_servers[serverName]);
+        }
+
+        public void ConnectTo(ServerProfile profile)
+        {
+            pendingConnection = profile;
+
+            if (IsConnected())
             {
                 _client.Shutdown("Changing connection");
             }
             else
             {
                 CheckPendingConnection();
-            }                      
+            }
+        }
+
+        public bool IsConnected()
+        {
+            return _client != null && !(_client.ConnectionStatus == NetConnectionStatus.None || _client.ConnectionStatus == NetConnectionStatus.Disconnected);
+        }        
+        
+        public bool IsRunning()
+        {
+            return _running;
         }
 
         public void CheckPendingConnection()
         {
-            Console.WriteLine("Checking pending connections...");
-            if(pendingConnection.Item1 == "")
+            Console.WriteLine("[CLIENT] Checking pending connections...");
+            if(pendingConnection == null)
             {
-                Console.WriteLine("No pending connections...");
+                Console.WriteLine("[CLIENT] No pending connections...");
                 return;
             }
 
-            Console.WriteLine("Connecting...");
+            Console.WriteLine($"[CLIENT] Connecting to {pendingConnection.Name}...");
 
-            string appIdentifier = pendingConnection.Item1;
-            string host = pendingConnection.Item2;
-            int port = pendingConnection.Item3;
-            pendingConnection = ("", "", 0);
-
-            var config = new NetPeerConfiguration(appIdentifier);
-            var newClient = new NetClient(config);
+            NetPeerConfiguration config = new NetPeerConfiguration(pendingConnection.AppIdentifier);
+            NetClient newClient = new NetClient(config);
             newClient.Start();
 
-            _host = host;
-            _port = port;
-
-            NetOutgoingMessage hail = newClient.CreateMessage("Client connecting...");
-            newClient.Connect(_host, _port, hail);
+            NetOutgoingMessage hail = newClient.CreateMessage($"Client connecting");
+            newClient.Connect(pendingConnection.Host, pendingConnection.Port, hail);
 
             _client = newClient;
         }
 
+        public void SetCurrentConnection(string appIdentifier)
+        {
+            foreach (var kvp in _servers)
+            {
+                if (kvp.Value.AppIdentifier == appIdentifier)
+                {
+                    pendingConnection = null;
+                    currentConnection = kvp.Value;
+                    return;
+                }
+            }
+
+            Console.WriteLine($"[CLIENT] No server found with appIdentifier {appIdentifier}.");
+        }
+
         public void Disconnect()
         {
-            //Lock client here or something ? 
-            if (_client != null && !(_client.ConnectionStatus == NetConnectionStatus.None || _client.ConnectionStatus == NetConnectionStatus.Disconnected))
+            if (IsConnected())
             {
                 _client.Shutdown("Disconnect");
             }
@@ -139,6 +174,7 @@ namespace Bearyon.Shared
                                          status == NetConnectionStatus.None)
                                 {
                                     _client = null;
+                                    currentConnection = null;
                                     _handler.OnDisconnected(im.SenderConnection);                                    
                                 }
                                 break;
@@ -154,7 +190,7 @@ namespace Bearyon.Shared
                     }
                 }
 
-                Thread.Sleep(10); // small sleep to reduce CPU load but keep it responsive
+                Thread.Sleep(10);
             }
         }
 
@@ -162,7 +198,8 @@ namespace Bearyon.Shared
         {
             if (_client == null || _client.ConnectionStatus != NetConnectionStatus.Connected)
             {
-                throw new InvalidOperationException("Client is not connected.");
+                Console.WriteLine($"[CLIENT] Can't send packet, client not connected.");
+                return;
             }
 
             NetOutgoingMessage om = _client.CreateMessage();

@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Bearyon.Network.Server
 {
@@ -27,15 +28,48 @@ namespace Bearyon.Network.Server
             }
         }
 
+        public override void OnConnected(NetConnection conn)
+        {
+
+        }
+
+        public override void OnDisconnected(NetConnection conn)
+        {
+            Room? room = MasterServer.Lobby.GetRoomByConnection(conn);
+            if (room != null)
+            {
+                MasterServer.Lobby.RemoveRoom(room.RoomId);
+            }
+        }
+
         protected virtual void HandleRoomConnectionRequest(RoomConnectionRequestPacket roomConnectionRequest, NetConnection conn)
         {
             Room room = MasterServer.Lobby.GetRoom(roomConnectionRequest.RoomId);
+            string errorMessage = "";
 
-            if (room != null)
+            if(room != null)
             {
                 room.Connected = true;
                 room.Connection = conn;
+
+                PacketMetadata data = new PacketMetadata();
+                data.Add("AppIdentifier", _serverEndpoint.GetProfile().AppIdentifier);
+
+                Send(new RoomConnectionResponsePacket()
+                {
+                    Success = true,
+                    ErrorMessage = errorMessage,
+                    Data = data
+                }, conn);
             }
+            else
+            {
+                Send(new RoomConnectionResponsePacket()
+                {
+                    Success = false,
+                    ErrorMessage = "Room is not registered"
+                }, conn);
+            }             
         }
     }
 }

@@ -7,18 +7,16 @@ namespace Bearyon.Room
     {
         static void Main(string[] args)
         {
-            int roomId = int.Parse(args[0]);
-            string roomName = args[1];
-            int maxPlayers = int.Parse(args[2]);
-            int roomPort = int.Parse(args[3]);
-            int gamePort = int.Parse(args[4]);
+            int masterPort = int.Parse(args[0]);
+            string roomId = args[1];
+            int roomPort = int.Parse(args[2]);
 
             PacketRegistry.RegisterAllPackets();
             
             RoomClientPacketHandler roomClientPacketHandler = new RoomClientPacketHandler();
             GameServerPacketHandler gameServerPacketHandler = new GameServerPacketHandler();            
 
-            RoomServer server = new RoomServer(roomId, roomPort, gamePort, roomClientPacketHandler, gameServerPacketHandler);
+            RoomServer server = new RoomServer(masterPort, roomId, roomPort, roomClientPacketHandler, gameServerPacketHandler);
             server.Start();
         }
     }

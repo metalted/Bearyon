@@ -8,8 +8,4 @@
     <PackageReference Include="Lidgren.Network" Version="1.0.2" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Packets\Room\" />
-  </ItemGroup>
-
 </Project>

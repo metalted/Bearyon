@@ -3,26 +3,20 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Bearyon.Shared.Packets.Lobby
+namespace Bearyon.Shared.Packets.Room
 {
-    public struct CreateRoomResponsePacket : IPacket
+    public struct RoomDetailsRequestPacket : IPacket
     {
-        public bool Success;
         public string RoomId;
-        public string Error;
 
         public void Serialize(NetOutgoingMessage om)
         {
-            om.Write(Success);
             om.Write(RoomId);
-            om.Write(Error ?? string.Empty);
         }
 
         public void Deserialize(NetIncomingMessage im)
         {
-            Success = im.ReadBoolean();
             RoomId = im.ReadString();
-            Error = im.ReadString();
         }
     }
 }

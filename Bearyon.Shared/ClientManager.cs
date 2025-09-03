@@ -7,24 +7,33 @@ namespace Bearyon.Shared
     public class ClientManager
     {
         private int _nextClientId = 1;
-        private readonly Dictionary<int, ClientInfo> _clients = new Dictionary<int, ClientInfo>();
+        private readonly Dictionary<string, ClientInfo> _clients = new Dictionary<string, ClientInfo>();
 
-        public ClientInfo RegisterClient(NetConnection conn)
+        public bool RegisterClient(string clientUID, NetConnection conn, out ClientInfo clientInfo, out string errorMessage)
         {
+            if(_clients.ContainsKey(clientUID))
+            {
+                clientInfo = null;
+                errorMessage = "Client already registered";
+                return false;
+            }
+
             ClientInfo client = new ClientInfo
             {
-                ClientId = _nextClientId++,
+                ClientUID = clientUID,
                 Connection = conn,
                 CurrentRoomId = null
             };
 
-            _clients.Add(client.ClientId, client);
-            return client;
+            _clients.Add(clientUID, client);
+            clientInfo = client;
+            errorMessage = "";
+            return true;
         }
 
-        public ClientInfo GetClient(int id)
+        public ClientInfo GetClient(string uid)
         {
-            if (_clients.TryGetValue(id, out var client))
+            if (_clients.TryGetValue(uid, out var client))
                 return client;
             return null;
         }
@@ -39,10 +48,16 @@ namespace Bearyon.Shared
             return null;
         }
 
-        public void RemoveClient(int clientId)
+        public void RemoveClient(string uid)
         {
-            Console.WriteLine("[CLIENT_MANAGER] Removed Client " + clientId);
-            _clients.Remove(clientId);
+            if(!_clients.ContainsKey(uid))
+            {
+                Console.WriteLine("[CLIENT_MANAGER] Player to remove is not registered.");
+                return;
+            }
+
+            Console.WriteLine("[CLIENT_MANAGER] Removing Client " + uid);
+            _clients.Remove(uid);              
         }
     }
 }

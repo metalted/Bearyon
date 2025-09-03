@@ -7,6 +7,34 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
+/*This is where we start, so here will be the todo
+ 
+- Players need better profiles, the server needs to know about players, what they are doin.
+- Players can have metadata
+- ClientIds across the whole network must be the same.
+- Clients need unique Ids.
+
+- Rooms must communicate with the masterserver more to update playercount etc
+- Rooms must have a status like private and open
+- Room can have metadata
+- Rooms must have a password protection
+- Rooms need unique IDs
+- Room names
+- Player tracking accross rooms
+
+
+- Room chat
+- Global chat
+
+- Kick and ban players from a server
+- Discord login or some other form of authentication
+- Built in voice chat, proximity chat is best
+
+- Room events like player joined, player left etc.
+- Auto cleanup empty rooms
+- Master Server Announcements
+*/
+
 namespace Bearyon.Network.Client
 {
     public class ClientPacketHandler : PacketHandler
@@ -47,9 +75,6 @@ namespace Bearyon.Network.Client
         public override void OnDisconnected(NetConnection conn)
         {
             Console.WriteLine($"[CLIENT] Disconnected");
-
-            _clientEndpoint.Location = ClientLocation.None;
-
             _clientEndpoint.CheckPendingConnection();
         }
 
@@ -57,6 +82,7 @@ namespace Bearyon.Network.Client
         {
             Send(new ClientConnectionRequestPacket()
             {
+                ClientUID = _clientEndpoint.ClientUID
             });
             Console.WriteLine($"[CLIENT] Sent ClientConnectionRequest");
         }
@@ -78,7 +104,7 @@ namespace Bearyon.Network.Client
             Console.WriteLine($"[CLIENT] Requested CreateRoom: {name} ({maxPlayers} players)");
         }
 
-        public virtual void SendJoinRoomRequest(int roomId)
+        public virtual void SendJoinRoomRequest(string roomId)
         {
             Send(new JoinRoomRequestPacket
             {
@@ -91,9 +117,8 @@ namespace Bearyon.Network.Client
         {
             if (packet.Success)
             {
-                _clientEndpoint.ClientID = packet.ClientId;
-                _clientEndpoint.Location = ClientLocation.Lobby;
-                Console.WriteLine("[CLIENT] ClientId = " + _clientEndpoint.ClientID);
+                _clientEndpoint.SetCurrentConnection(packet.Data.Get("AppIdentifier"));
+                Console.WriteLine($"[CLIENT] Connection accepted from {packet.Data.Get("AppIdentifier")}");
             }
             else
             {
@@ -110,7 +135,7 @@ namespace Bearyon.Network.Client
             {
                 foreach (RoomSummary s in roomSummaryList.Rooms)
                 {
-                    Console.WriteLine($"RoomId: {s.RoomId} | Name: {s.Name} | MaxPlayers: {s.MaxPlayers} | Players: {s.PlayerCount} )");
+                    Console.WriteLine($"RoomId: {s.RoomId} | Name: {s.Name} | MaxClients: {s.MaxClients} | Clients: {s.ClientCount} )");
                 }
             }
             else
@@ -124,18 +149,19 @@ namespace Bearyon.Network.Client
             Console.WriteLine($"[CLIENT] Received CreateRoomResponse: Room created with id: {packet.RoomId}");
         }
 
-        protected virtual void HandleJoinRoomResponse(JoinRoomResponsePacket packet, NetConnection conn)
+        protected virtual void HandleJoinRoomResponse(JoinRoomResponsePacket joinRoomResponse, NetConnection conn)
         {
             Console.WriteLine($"[CLIENT] ReceivedJoinRoomResponse.");
 
-            if (packet.Success)
+            if (joinRoomResponse.Success)
             {
                 Console.WriteLine($"[CLIENT] Success: Joining Room");
-                _clientEndpoint.ConnectTo("bearyon_game_server", "127.0.0.1", packet.GamePort);
+                _clientEndpoint.AddServer(new ServerProfile("Game", "bearyon_game_server", "127.0.0.1", joinRoomResponse.GamePort));
+                _clientEndpoint.ConnectTo("Game");
             }
             else
             {
-                Console.WriteLine($"[CLIENT] Error: {packet.Error}");
+                Console.WriteLine($"[CLIENT] Error: {joinRoomResponse.Error}");
             }
         }
 
@@ -150,13 +176,16 @@ namespace Bearyon.Network.Client
 
             if (packet.Success)
             {
-                _clientEndpoint.ClientID = packet.ClientId;
-                _clientEndpoint.Location = ClientLocation.Game;
-                Console.WriteLine("[CLIENT] ClientID = " + _clientEndpoint.ClientID);
+                _clientEndpoint.SetCurrentConnection(packet.Data.Get("AppIdentifier"));
+                Console.WriteLine($"[CLIENT] Connection accepted from {packet.Data.Get("AppIdentifier")}");
             }
             else
             {
                 Console.WriteLine("[CLIENT] Connection refused: " + packet.ErrorMessage);
+
+                //Connect back to lobby
+                _clientEndpoint.ConnectTo("Lobby");
+                
             }
         }
     }

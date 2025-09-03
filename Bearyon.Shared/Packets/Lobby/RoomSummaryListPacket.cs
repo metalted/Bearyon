@@ -16,8 +16,8 @@ namespace Bearyon.Shared.Packets.Lobby
             {
                 om.Write(room.RoomId);
                 om.Write(room.Name ?? string.Empty);
-                om.Write(room.PlayerCount);
-                om.Write(room.MaxPlayers);
+                om.Write(room.ClientCount);
+                om.Write(room.MaxClients);
             }
         }
 
@@ -28,10 +28,10 @@ namespace Bearyon.Shared.Packets.Lobby
             for (int i = 0; i < count; i++)
             {
                 RoomSummary s = new RoomSummary();
-                s.RoomId = im.ReadInt32();
+                s.RoomId = im.ReadString();
                 s.Name = im.ReadString();
-                s.PlayerCount = im.ReadInt32();
-                s.MaxPlayers = im.ReadInt32();
+                s.ClientCount = im.ReadInt32();
+                s.MaxClients = im.ReadInt32();
                 Rooms.Add(s);
             }
         }

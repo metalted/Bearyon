@@ -6,24 +6,33 @@ using Bearyon.Shared.Packets.Utilities;
 
 namespace Bearyon.TestClient
 {
-    internal class Program
+    //A basic client
+    public  class Program
     {
-        public static Client client;
+        //The client that handles all communications.
+        public static ClientEndpoint client;
+        //The packet handler manages all the traffic.
         public static ClientPacketHandler handler;
-        public static CommandManager commandManager;
+        //A local command manager that allows for easily executing functions.
+        public static CommandManager commandManager;       
 
         static void Main(string[] args)
         {
+            //Create the packet handler (can be custom)
             handler = new ClientPacketHandler();
-            client = new Client(handler);
 
+            //Create the client and pass it the handler.
+            client = new ClientEndpoint(handler);
+            client.AddServer(new ServerProfile("Lobby", "bearyon_lobby_server", "127.0.0.1", 14242));
+
+            //Create the commands.
             InitializeCommandManager(handler);
 
-            // start client on a background thread
+            //Start the client on a background thread. Client.Start() starts the while loop.
             Thread clientThread = new Thread(() => client.Start());
             clientThread.Start();            
 
-            // --- input loop ---
+            //Loop for console inputs.
             while (true)
             {
                 string input = Console.ReadLine();
@@ -37,12 +46,15 @@ namespace Bearyon.TestClient
             }
         }
 
+        //Basic commands
         public static void InitializeCommandManager(ClientPacketHandler handler)
         {
             commandManager = new CommandManager();
+            
+            //Connect to the master server.            
             commandManager.Register("/connect", _ =>
             {
-                client.ConnectTo("bearyon_lobby_server", "127.0.0.1", 14242);
+                client.ConnectTo("Lobby");
             });
             commandManager.Register("/disconnect", _ =>
             {
@@ -53,9 +65,9 @@ namespace Bearyon.TestClient
                 handler.SendCreateRoomRequest((string)argsDict["name"], (int)argsDict["maxPlayers"]);
             });
 
-            commandManager.Register("/joinroom int:roomId", argsDict =>
+            commandManager.Register("/joinroom string:roomId", argsDict =>
             {
-                handler.SendJoinRoomRequest((int)argsDict["roomId"]);
+                handler.SendJoinRoomRequest((string)argsDict["roomId"]);
             });
 
             commandManager.Register("/list", argsDict =>
@@ -71,9 +83,13 @@ namespace Bearyon.TestClient
 
             commandManager.Register("/leave", _ =>
             {
-                if (client.GetLocation() == ClientLocation.Game)
+                if(client.currentConnection.Name == "Game")
                 {
-                    client.ConnectTo("bearyon_lobby_server", "127.0.0.1", 14242);
+                    client.ConnectTo("Lobby");
+                }
+                else if(client.currentConnection.Name == "Lobby")
+                {
+                    client.Disconnect();
                 }
             });
         }

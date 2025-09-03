@@ -1,4 +1,5 @@
 ﻿using Bearyon.Shared;
+using Lidgren.Network;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,19 +11,18 @@ namespace Bearyon.Network.Server
 {
     public class Lobby
     {
-        private int _nextRoomId = 1;
         private int _nextPort = 20000;
-        private readonly Dictionary<int, Room> _rooms = new Dictionary<int, Room>();
+        private readonly Dictionary<string, Room> _rooms = new Dictionary<string, Room>();
 
-        public Room CreateRoom(string name, int maxPlayers)
+        public Room CreateRoom(string name, int maxClients)
         {            
             int gamePort = _nextPort++;
-            int roomId = _nextRoomId++;
+            string roomId = System.Guid.NewGuid().ToString();
 
             var psi = new ProcessStartInfo
             {
-                FileName = "C:\\Users\\Ted\\source\\repos\\Bearyon\\Bearyon.Room\\bin\\Debug\\net8.0\\Bearyon.Room.exe", // path to your built RoomServer project
-                Arguments = $"{roomId} {name} {maxPlayers} {MasterServer.RoomPort} {gamePort}",
+                FileName = "C:\\Users\\Ted\\source\\repos\\Bearyon\\Bearyon.Room\\bin\\Debug\\net8.0\\Bearyon.Room.exe",
+                Arguments = $"{MasterServer.RoomPort} {roomId} {gamePort}",
                 UseShellExecute = true,
                 CreateNoWindow = false,
                 WindowStyle = ProcessWindowStyle.Normal
@@ -34,7 +34,7 @@ namespace Bearyon.Network.Server
             {
                 RoomId = roomId,
                 Name = name,
-                MaxPlayers = maxPlayers,
+                MaxClients = maxClients,
                 GamePort = gamePort,
                 Process = proc
             };
@@ -49,10 +49,30 @@ namespace Bearyon.Network.Server
             return new List<Room>(_rooms.Values);
         }
 
-        public Room GetRoom(int id)
+        public Room? GetRoomByConnection(NetConnection connection)
+        {
+            return _rooms.Values.FirstOrDefault(r => r.Connection == connection);
+        }
+
+        public Room GetRoom(string id)
         {
             if (_rooms.ContainsKey(id))
                 return _rooms[id];
+            return null;
+        }
+
+        public Room GetRoomByIndex(string index)
+        {
+            int roomIndex;
+            if(int.TryParse(index, out roomIndex))
+            {
+                string[] roomIds = _rooms.Keys.ToArray();
+                if(roomIds.Length <= roomIndex)
+                {
+                    return _rooms[roomIds[roomIndex]];
+                }
+            }
+
             return null;
         }
 
@@ -66,12 +86,17 @@ namespace Bearyon.Network.Server
                 {
                     RoomId = r.RoomId,
                     Name = r.Name,
-                    MaxPlayers = r.MaxPlayers,
-                    PlayerCount = 0
+                    MaxClients = r.MaxClients,
+                    ClientCount = r.GetClientCount()
                 });
             }
 
             return summaries;
+        }
+
+        public void RemoveRoom(string uid)
+        {
+            _rooms.Remove(uid);
         }
     }
 }

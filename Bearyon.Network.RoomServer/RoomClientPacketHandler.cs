@@ -6,6 +6,7 @@ using Lidgren.Network;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -15,7 +16,10 @@ namespace Bearyon.Network.RoomServer
     {
         public override void HandlePacket(IPacket packet, NetConnection conn)
         {
-
+            if(packet is RoomConnectionResponsePacket roomConnectionResponse)
+            {
+                HandleRoomConnectionResponse(roomConnectionResponse);
+            }
         }
 
         public override void OnConnected(NetConnection conn)
@@ -23,12 +27,27 @@ namespace Bearyon.Network.RoomServer
             SendRoomConnectionRequest(RoomServer.RoomId);
         }
 
-        public virtual void SendRoomConnectionRequest(int roomId)
+        public virtual void SendRoomConnectionRequest(string roomId)
         {
             Send(new RoomConnectionRequestPacket()
             {
                 RoomId = roomId
             });
+        }
+
+        public virtual void HandleRoomConnectionResponse(RoomConnectionResponsePacket packet)
+        {
+            if (packet.Success)
+            {
+                _clientEndpoint.SetCurrentConnection(packet.Data.Get("AppIdentifier"));
+                Console.WriteLine($"[CLIENT] Connection accepted from {packet.Data.Get("AppIdentifier")}");
+                RoomServer.Instance.Stop(3);
+            }
+            else
+            {
+                Console.WriteLine("[CLIENT] Connection refused: " + packet.ErrorMessage);
+                _clientEndpoint.Disconnect();                
+            }
         }
     }
 }

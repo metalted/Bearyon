@@ -29,20 +29,34 @@ namespace Bearyon.Network.RoomServer
         public override void OnDisconnected(NetConnection conn)
         {
             ClientInfo ci = RoomServer.ClientManager.GetByConnection(conn);
-            RoomServer.ClientManager.RemoveClient(ci.ClientId);
+            RoomServer.ClientManager.RemoveClient(ci.ClientUID);
         }
 
-        protected virtual void HandleClientConnectionRequest(ClientConnectionRequestPacket hello, NetConnection conn)
+        protected virtual void HandleClientConnectionRequest(ClientConnectionRequestPacket clientConnectionRequest, NetConnection conn)
         {
-            //Save and check the user here.
-            ClientInfo ci = RoomServer.ClientManager.RegisterClient(conn);
+            ClientInfo clientInfo;
+            string errorMessage;
 
-            Send(new GameConnectionResponsePacket()
+            if(RoomServer.ClientManager.RegisterClient(clientConnectionRequest.ClientUID, conn, out clientInfo, out errorMessage))
             {
-                Success = true,
-                ClientId = ci.ClientId,
-                ErrorMessage = "",
-            }, conn);
+                PacketMetadata data = new PacketMetadata();
+                data.Add("AppIdentifier", _serverEndpoint.GetProfile().AppIdentifier);
+
+                Send(new GameConnectionResponsePacket()
+                {
+                    Success = true,
+                    ErrorMessage = "",
+                    Data = data
+                }, conn);
+            }
+            else
+            {
+                Send(new GameConnectionResponsePacket()
+                {
+                    Success = false,
+                    ErrorMessage = errorMessage
+                }, conn);
+            }
         }
     }
 }

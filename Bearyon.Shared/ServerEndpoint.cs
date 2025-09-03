@@ -13,16 +13,16 @@ namespace Bearyon.Shared
         private readonly PacketHandler _handler;
         private volatile bool _running;
 
-        public int Port { get; }
+        private ServerProfile _profile;
 
         public ServerEndpoint(string appIdentifier, int port, int maxConnections, PacketHandler handler)
-        {
-            Port = port;
+        {            
             _handler = handler;
+            _profile = new ServerProfile("Server", appIdentifier, "127.0.0.1", port);
 
-            var config = new NetPeerConfiguration(appIdentifier)
+            NetPeerConfiguration config = new NetPeerConfiguration(appIdentifier)
             {
-                Port = port,
+                Port = _profile.Port,
                 MaximumConnections = maxConnections
             };
             _server = new NetServer(config);
@@ -39,6 +39,11 @@ namespace Bearyon.Shared
         {
             _running = false;
             _server.Shutdown("Server shutting down");
+        }
+
+        public ServerProfile GetProfile()
+        {
+            return _profile;
         }
 
         private void RunLoop()

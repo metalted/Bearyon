@@ -9,7 +9,7 @@ namespace Bearyon.Shared.Packets.Lobby
     {
         public bool Success;
         public string Error;
-        public int RoomId;
+        public string RoomId;
         public int GamePort;
 
         public void Serialize(NetOutgoingMessage om)
@@ -24,7 +24,7 @@ namespace Bearyon.Shared.Packets.Lobby
         {
             Success = im.ReadBoolean();
             Error = im.ReadString();
-            RoomId = im.ReadInt32();
+            RoomId = im.ReadString();
             GamePort = im.ReadInt32();
         }
     }    

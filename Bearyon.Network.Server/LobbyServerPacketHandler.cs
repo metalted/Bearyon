@@ -2,6 +2,7 @@
 using Bearyon.Shared.Packets.Connection;
 using Bearyon.Shared.Packets.Lobby;
 using Lidgren.Network;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Bearyon.Network.Server
 {
@@ -11,9 +12,9 @@ namespace Bearyon.Network.Server
         {
             Console.WriteLine("[LOBBY_SERVER] Received packet of type: " + packet.GetType().Name);
 
-            if (packet is ClientConnectionRequestPacket hello)
+            if (packet is ClientConnectionRequestPacket clientConnectionRequest)
             {
-                HandleClientHello(hello, conn);
+                HandleClientConnectionRequest(clientConnectionRequest, conn);
             }
             else if (packet is ListRoomRequestPacket listRooms)
             {
@@ -35,21 +36,35 @@ namespace Bearyon.Network.Server
 
         public override void OnDisconnected(NetConnection conn)
         {
-            ClientInfo ci = MasterServer.ClientManager.GetByConnection(conn);
-            MasterServer.ClientManager.RemoveClient(ci.ClientId);
+            ClientInfo clientInfo = MasterServer.ClientManager.GetByConnection(conn);
+            MasterServer.ClientManager.RemoveClient(clientInfo.ClientUID);
         }
 
-        protected virtual void HandleClientHello(ClientConnectionRequestPacket hello, NetConnection conn)
+        protected virtual void HandleClientConnectionRequest(ClientConnectionRequestPacket clientConnectionRequest, NetConnection conn)
         {
-            //Save and check the user here.
-            ClientInfo ci = MasterServer.ClientManager.RegisterClient(conn);
-
-            Send(new LobbyConnectionResponsePacket()
+            ClientInfo clientInfo;
+            string errorMessage;
+            
+            if(MasterServer.ClientManager.RegisterClient(clientConnectionRequest.ClientUID, conn, out clientInfo, out errorMessage))
             {
-                Success = true,
-                ClientId = ci.ClientId,
-                ErrorMessage = ""
-            }, conn);
+                PacketMetadata data = new PacketMetadata();
+                data.Add("AppIdentifier", _serverEndpoint.GetProfile().AppIdentifier);
+
+                Send(new LobbyConnectionResponsePacket()
+                {
+                    Success = true,
+                    ErrorMessage = errorMessage,
+                    Data = data
+                }, conn);
+            }
+            else
+            {
+                Send(new LobbyConnectionResponsePacket()
+                {
+                    Success = false,
+                    ErrorMessage = errorMessage
+                }, conn);
+            }
         }
 
         protected virtual void HandleListRoomsRequest(ListRoomRequestPacket listRooms, NetConnection conn)
@@ -73,6 +88,7 @@ namespace Bearyon.Network.Server
 
         protected virtual void HandleJoinRoomRequest(JoinRoomRequestPacket joinRoom, NetConnection conn)
         {
+            //Room roomToJoin = MasterServer.Lobby.GetRoom(joinRoom.RoomId);
             Room roomToJoin = MasterServer.Lobby.GetRoom(joinRoom.RoomId);
 
             if (roomToJoin == null)
@@ -95,7 +111,7 @@ namespace Bearyon.Network.Server
                 return;
             }
 
-            if(roomToJoin.CurrentPlayers >= roomToJoin.MaxPlayers)
+            if(roomToJoin.GetClientCount() >= roomToJoin.MaxClients)
             {
                 Send(new JoinRoomResponsePacket()
                 {

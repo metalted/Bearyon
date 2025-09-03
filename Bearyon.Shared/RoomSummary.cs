@@ -6,9 +6,9 @@ namespace Bearyon.Shared
 {
     public struct RoomSummary
     {
-        public int RoomId;
+        public string RoomId;
         public string Name;
-        public int PlayerCount;
-        public int MaxPlayers;
+        public int ClientCount;
+        public int MaxClients;
     }
 }

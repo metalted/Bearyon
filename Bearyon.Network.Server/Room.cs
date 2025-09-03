@@ -10,13 +10,34 @@ namespace Bearyon.Network.Server
 {
     public class Room
     {
-        public int RoomId;
+        public string RoomId;
         public string Name;
-        public int MaxPlayers;
-        public int CurrentPlayers;
-        public int GamePort { get; set; }
-        public Process Process { get; set; }
+        public int MaxClients;
+        public int GamePort;
+        public Process Process;
         public bool Connected;
-        public NetConnection Connection { get; set; }
+        public NetConnection Connection;
+        private List<string> _clientUIDs = new List<string>();
+
+        public void AddClient(string uid)
+        {
+            if(!_clientUIDs.Contains(uid))
+            {
+                _clientUIDs.Add(uid);
+            }
+        }
+
+        public void RemoveClient(string uid)
+        {
+            if (_clientUIDs.Contains(uid))
+            {
+                _clientUIDs.Remove(uid);
+            }
+        }
+
+        public int GetClientCount()
+        {
+            return _clientUIDs.Count;
+        }
     }
 }
